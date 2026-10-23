@@ -1,0 +1,117 @@
+name: measure-docker
+on:
+  workflow_dispatch:
+jobs:
+  build-cpu-amd64:
+    name: Build CPU AMD64 Image
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Docker Buildx
+      id: buildx
+      continue-on-error: true
+      uses: docker/setup-buildx-action@v3
+    - name: Wait before retrying Buildx setup
+      if: steps.buildx.outcome == 'failure'
+      run: sleep 30
+    - name: Set up Docker Buildx (retry)
+      if: steps.buildx.outcome == 'failure'
+      uses: docker/setup-buildx-action@v3
+    - name: Build CPU AMD64 image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        push: false
+        platforms: linux/amd64
+        provenance: false
+        sbom: false
+        outputs: type=image,name=measure/chainforge,push=false
+      id: build-amd64
+  build-cpu-arm64:
+    name: Build CPU ARM64 Image
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Docker Buildx
+      id: buildx
+      continue-on-error: true
+      uses: docker/setup-buildx-action@v3
+    - name: Wait before retrying Buildx setup
+      if: steps.buildx.outcome == 'failure'
+      run: sleep 30
+    - name: Set up Docker Buildx (retry)
+      if: steps.buildx.outcome == 'failure'
+      uses: docker/setup-buildx-action@v3
+    - name: Build CPU ARM64 image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        push: false
+        platforms: linux/arm64
+        provenance: false
+        sbom: false
+        outputs: type=image,name=measure/chainforge,push=false
+      id: build-arm64
+  build-gpu-amd64:
+    name: Build GPU AMD64 Image
+    runs-on: ubuntu-latest
+    steps:
+    - name: Free up disk space
+      run: |
+        echo "Before cleanup:"
+        df -h
+
+        # Remove unnecessary software to free up space
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
+        sudo rm -rf /usr/local/share/boost
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+        # Remove large packages
+        sudo apt-get remove -y '^aspnetcore-.*' || true
+        sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
+        sudo apt-get remove -y '^llvm-.*' --fix-missing || true
+        sudo apt-get remove -y 'php.*' --fix-missing || true
+        sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
+        sudo apt-get remove -y '^mysql-.*' --fix-missing || true
+        sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
+        sudo apt-get remove -y google-cloud-sdk --fix-missing || true
+        sudo apt-get remove -y google-cloud-cli --fix-missing || true
+
+        # Clean up
+        sudo apt-get autoremove -y
+        sudo apt-get clean
+        sudo docker image prune --all --force
+        sudo rm -rf /var/lib/apt/lists/*
+
+        echo "After cleanup:"
+        df -h
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: Set up Docker Buildx
+      id: buildx
+      continue-on-error: true
+      uses: docker/setup-buildx-action@v3
+    - name: Wait before retrying Buildx setup
+      if: steps.buildx.outcome == 'failure'
+      run: sleep 30
+    - name: Set up Docker Buildx (retry)
+      if: steps.buildx.outcome == 'failure'
+      uses: docker/setup-buildx-action@v3
+    - name: Build GPU AMD64 image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.gpu
+        push: false
+        platforms: linux/amd64
+        provenance: false
+        sbom: false
+        outputs: type=image,name=measure/chainforge,push=false
+      id: build-gpu
